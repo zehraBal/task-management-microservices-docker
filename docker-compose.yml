@@ -1,0 +1,230 @@
+services:
+  postgres-user:
+    image: postgres:15-alpine
+    container_name: postgres-user
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+
+  postgres-task:
+    image: postgres:15-alpine
+    container_name: postgres-task
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_TASK_DB}
+      POSTGRES_USER: ${POSTGRES_TASK_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_TASK_PASSWORD}
+    ports:
+      - "5434:5432"
+    networks:
+      - backend
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_TASK_USER} -d ${POSTGRES_TASK_DB}",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+
+  eureka-server:
+    build:
+      context: ./Eureka_Server/eureka_server
+    container_name: eureka-server
+    env_file: .env
+    ports:
+      - "8761:8761"
+    networks:
+      - backend
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "-q",
+          "http://localhost:8761/actuator/health",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+
+  config-server:
+    build:
+      context: ./Config_Server/config_server
+    container_name: config-server
+    env_file: .env
+    ports:
+      - "8888:8888"
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - backend
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "-q",
+          "http://localhost:8888/actuator/health",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+
+  api-gateway:
+    build:
+      context: ./Api_Gateway/api_gateway
+    container_name: api-gateway
+    env_file: .env
+    ports:
+      - "8080:8080"
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    networks:
+      - backend
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "-q",
+          "http://localhost:8080/actuator/health",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+
+  auth-service:
+    build:
+      context: ./Auth_Service/auth-service
+    container_name: auth-service
+    env_file: .env
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "-q",
+          "http://localhost:8083/actuator/health",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+
+  user-service:
+    build:
+      context: ./User_Service/user-service
+    container_name: user-service
+    env_file: .env
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-user:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      postgres-user:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "-q",
+          "http://localhost:8082/actuator/health",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+
+  task-service:
+    build:
+      context: ./Task_Service/task-service
+    container_name: task-service
+    env_file: .env
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-task:5432/${POSTGRES_TASK_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_TASK_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_TASK_PASSWORD}
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      postgres-task:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "-q",
+          "http://localhost:8084/actuator/health",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+
+networks:
+  backend:
+    driver: bridge
