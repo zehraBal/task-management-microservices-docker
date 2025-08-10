@@ -1,0 +1,21 @@
+[submodule "api-gateway"]
+	path = api-gateway
+	url = https://github.com/zehraBal/todo_backend_api_gateway
+[submodule "eureka-server"]
+	path = eureka-server
+	url = https://github.com/zehraBal/todo_backend_eureka_server
+[submodule "config-server"]
+	path = config-server
+	url = https://github.com/zehraBal/todo_backend_config_server
+[submodule "user-service"]
+	path = user-service
+	url = https://github.com/zehraBal/todo_backend_user_service
+[submodule "task-service"]
+	path = task-service
+	url = https://github.com/zehraBal/todo_backend_task_service
+[submodule "auth-service"]
+	path = auth-service
+	url = https://github.com/zehraBal/todo_backend_auth_service
+[submodule "global-config"]
+	path = global-config
+	url = https://github.com/zehraBal/global-config
